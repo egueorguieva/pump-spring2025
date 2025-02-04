@@ -1,4 +1,4 @@
-import praw
+import praw   # might need to pip or pip3 install praw/other packages
 from prawcore import ResponseException
 import pandas as pd
 from datetime import datetime, timezone
