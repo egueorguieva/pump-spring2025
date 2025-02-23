@@ -93,17 +93,17 @@ def scrape_reddit(reddit, subreddit_name, start_date, end_date, num_posts, is_te
 
 def run():
     reddit = praw.Reddit(
-        client_id="",
-        client_secret="",
-        user_agent="Scrapping webposts and comments from webpost)",
-        username="",
-        password=""
+        client_id="GeKGjrUPiqR0kDBHqfm8Ew",  # Replace with your client_id
+        client_secret="yIo5D43dRepuqEWjoahtQEmIRCL3uw",  # Replace with your client_secret
+        user_agent="python:scraperbot:v1.0 (by /u/Plane_Tear6234)",
+        username="Plane_Tear6234",
+        password="vfQ8sHBY_U_f$Vc"  # Replace with your Reddit password
     )
 
-    start_date = int(datetime(2022, 1, 1, tzinfo=timezone.utc).timestamp())
+    start_date = int(datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp())
     end_date = int(datetime(2024, 12, 31, tzinfo=timezone.utc).timestamp())
 
-    posts_df, comments_df, combined_df = scrape_reddit(reddit, "dating", start_date, end_date, num_posts=300, is_test=False)
+    posts_df, comments_df, combined_df = scrape_reddit(reddit, "OregonStateUniv", start_date, end_date, num_posts=250, is_test=False)
 
     print("\nTest run completed. Sample of combined data:")
     print(combined_df.head())
