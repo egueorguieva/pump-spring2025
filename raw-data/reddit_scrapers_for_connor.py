@@ -100,10 +100,10 @@ def run():
         password="vfQ8sHBY_U_f$Vc"  # Replace with your Reddit password
     )
 
-    start_date = int(datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp())
-    end_date = int(datetime(2024, 12, 31, tzinfo=timezone.utc).timestamp())
+    start_date = int(datetime(2018, 1, 1, tzinfo=timezone.utc).timestamp())
+    end_date = int(datetime(2021, 12, 31, tzinfo=timezone.utc).timestamp())
 
-    posts_df, comments_df, combined_df = scrape_reddit(reddit, "byu", start_date, end_date, num_posts=250, is_test=False)
+    posts_df, comments_df, combined_df = scrape_reddit(reddit, "OregonStateUniv", start_date, end_date, num_posts=250, is_test=False)
 
     print("\nTest run completed. Sample of combined data:")
     print(combined_df.head())
