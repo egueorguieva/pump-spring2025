@@ -93,11 +93,11 @@ def scrape_reddit(reddit, subreddit_name, start_date, end_date, num_posts, is_te
 
 def run():
     reddit = praw.Reddit(
-        client_id="GeKGjrUPiqR0kDBHqfm8Ew",  # Replace with your client_id
-        client_secret="yIo5D43dRepuqEWjoahtQEmIRCL3uw",  # Replace with your client_secret
-        user_agent="python:scraperbot:v1.0 (by /u/Plane_Tear6234)",
-        username="Plane_Tear6234",
-        password="vfQ8sHBY_U_f$Vc"  # Replace with your Reddit password
+        client_id="###",  # Replace with your client_id
+        client_secret="###",  # Replace with your client_secret
+        user_agent="###",
+        username="###",
+        password="###"  # Replace with your Reddit password
     )
 
     start_date = int(datetime(2017, 1, 1, tzinfo=timezone.utc).timestamp())  #2021, 1, 1,
