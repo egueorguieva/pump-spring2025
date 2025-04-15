@@ -1,0 +1,130 @@
+---
+title: "e.s.g. pump analysis"
+author: "e.s.g."
+date: "2025-04-14"
+output: html_document
+---
+
+Here we create a visualization of means of the LIWC categories we're interested in.
+```{r mean plots}
+
+library(tidyverse)
+
+# load in data
+df <- read_csv('subreddit-LIWC.csv')
+
+# LIWC categories 
+# I made edits to the ones you picked so we'd see the whole picture
+metrics <- c("i", "we", "you", "shehe", "they", "emo_pos", "emo_anx", "emo_sad",  "emo_anger", "prosocial", "affiliation", "work")
+
+# pivot data so we can calculate means and ses
+d_long <- df %>%
+  pivot_longer(cols = all_of(metrics),
+               names_to = "metric",
+               values_to = "value")
+
+# visualize mean differences with error bars
+ggplot(d_long, aes(x = school, y = value, fill = school)) +
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(), width = 0.7) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2, position = position_dodge(.7)) +
+  facet_wrap(~ metric, scales = "free_y") +
+  labs(title = "Mean LIWC Scores by University",
+       y = "Mean Score",
+       x = "University Subreddit") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+
+
+```
+
+
+Next, we want to know if different university subreddit used different kinds of language, but longer posts on those subreddits might naturally have more of certain words (like i words, or sad words) simply because they have more words in general.
+We should account for that, since our analysis would otherwise tell us that some posts use more words rather than that there are meaningful differences between language in subreddits.
+
+So this analysis helps us answer the question:
+``Do subreddits differ in their use of a certain kind of language, even after we've adjusted for post length?"
+
+We also look at partial eta-squared here. This will tell us how big the effect is (if there is one). The smaller the value, the less that the subreddit explains the differences.
+
+Think of it like:
+``Out of all the reasons why the language metric changes, how much of that change is because of the subreddit?"
+
+We use partial eta-squared since we're controlling for other differences, like post length.
+```{r ancova}
+
+library(car)
+library(effectsize)
+
+# load in data
+df <- read_csv('subreddit-LIWC.csv')
+
+# LIWC categories we're interested in
+metrics <- c("i", "we", "you", "shehe", "they", "emo_pos", "emo_anx", "emo_sad",  "emo_anger", "prosocial", "affiliation", "work")
+
+# initialize dataframe for ANCOVA results
+results <- data.frame() 
+
+# run ANCOVA for every LIWC variable
+for (m in metrics) {
+  model <- lm(as.formula(paste(m, "~ school + WC")), data = df)
+  anova_res <- Anova(model, type = "III")
+  eta <- eta_squared(model, partial = TRUE)
+  
+  F_val <- anova_res["school", "F value"]
+  df1 <- anova_res["school", "Df"]
+  df2 <- df.residual(model)
+  p_val <- anova_res["school", "Pr(>F)"]
+  eta2 <- eta$Eta2_partial[eta$Parameter == "school"]
+  
+  new_row <- data.frame(
+    metric = m,
+    F_value = F_val,
+    df1 = df1,
+    df2 = df2,
+    p_value = p_val,
+    partial_eta2 = eta2
+  )
+  
+  results <- rbind(results, new_row)
+}
+
+print(results)
+
+
+# okay, so all the results are significant lol
+# expected, tbh. but i'm pleasantly surprised even after controlling for word count
+# so now we need to find out exactly which groups differ sinificantly for which LIWC metrics
+
+# post-hoc testing using Tukey HSD
+
+# make sure subreddit is being treated as a factor
+df$school <- as.factor(df$school)
+
+# initialize empty df
+all_sig_results <- data.frame()
+
+# Loop through each liwc measure
+for (m in metrics) {
+  aov_model <- aov(as.formula(paste(m, "~ school + WC")), data = df)
+  tukey_results <- suppressWarnings(TukeyHSD(aov_model, "school"))
+  
+  tukey_df <- as.data.frame(tukey_results$school)
+  tukey_df$comparison <- rownames(tukey_df)
+  
+  sig_results <- subset(tukey_df, `p adj` < 0.05) # filter for significant diffs only
+  
+  if (nrow(sig_results) > 0) {
+    sig_results$metric <- m  
+    all_sig_results <- rbind(all_sig_results, sig_results)
+  }
+}
+
+all_sig_results <- all_sig_results[, c("metric", "comparison", "diff", "p adj")]
+print(all_sig_results)
+
+
+# now you know which groups significantly differ between liwc metrics!
+
+```
