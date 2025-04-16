@@ -1,45 +1,41 @@
-# === Load packages ===
-install.packages("effectsize")
-library(effectsize)    # For eta-squared
-library(tidyverse)
-library(ggplot2)
-library(patchwork)     # Combine multiple plots
-library(reshape2)      # For heatmap
-install.packages("pheatmap")
-library(pheatmap)
-library(knitr)
-library(kableExtra)
-install.packages("gt")
-library(gt)
+# === Load Required Packages ===
+library(tidyverse)     # Includes dplyr, tidyr, ggplot2
+library(car)           # For Type III ANOVA
+library(effectsize)    # For partial eta squared
+library(ggpubr)        # For tables
+library(RColorBrewer)  # for color themes
 
-# === Load and trim data ===
-df_use <- read.csv('/Users/cp/Documents/GitHub/pump-spring2025/r_analysis/clean_LIWC_data/df_use.csv')
-df_use_drop <- df_use[1:(nrow(df_use) - 194), ]
+# === Load and Prepare Data ===
+df <- read.csv('/Users/cp/Documents/GitHub/pump-spring2025/eg-analysis/subreddit-LIWC.csv')
+df$school <- as.factor(df$school)
 
-# === LIWC Variables to Analyze ===
-variables <- c("ppron", "i", "we", "you", 
-               "cogproc", "emo_pos", "emo_neg", 
-               "prosocial", "affiliation", "work")
+# Rename school labels for clarity in plots
+levels(df$school) <- c("BYU", "Harvard", "Oregon State", "UT Austin", "Williams College")
 
-# === ANOVA: F, p, eta-squared ===
-anova_summary <- map_dfr(variables, function(var) {
-  model <- aov(as.formula(paste(var, "~ school")), data = df_use_drop)
-  summary_out <- summary(model)[[1]]
-  eta <- eta_squared(model, partial = FALSE)
+# === LIWC Variable Groups ===
+variables <- c("i", "we", "you", "shehe", "emo_pos", "emo_anx", "emo_sad", "emo_anger")
+emotion_words <- c("emo_pos", "emo_anx", "emo_sad", "emo_anger")
+function_words <- c("i", "we", "you", "shehe")
+
+# === ANCOVA: Effect of School on Each LIWC Variable, Controlling for Word Count ===
+ancova_results <- map_dfr(variables, function(var) {
+  model <- lm(as.formula(paste(var, "~ school + WC")), data = df)
+  anova_out <- Anova(model, type = "III")
+  eta_out <- eta_squared(model, partial = TRUE)
   
   tibble(
     Variable = var,
-    F_stat = round(summary_out$`F value`[1], 3),
-    p_value = signif(summary_out$`Pr(>F)`[1], 5),
-    eta_squared = round(eta$Eta2[1], 3)
+    F_stat = round(anova_out["school", "F value"], 3),
+    p_value = signif(anova_out["school", "Pr(>F)"], 5),
+    partial_eta2 = round(eta_out$Eta2_partial[eta_out$Parameter == "school"], 3)
   )
 })
 
-print("ANOVA Summary:")
-print(anova_summary)
+print("ANCOVA Summary:")
+print(ancova_results)
 
-# === Group means by school ===
-school_means <- df_use_drop %>%
+# === Group Means by School ===
+school_means <- df %>%
   select(school, all_of(variables)) %>%
   group_by(school) %>%
   summarise(across(everything(), ~ round(mean(.x, na.rm = TRUE), 3)))
@@ -47,83 +43,91 @@ school_means <- df_use_drop %>%
 print("Means by School:")
 print(school_means)
 
-# === Post-Hoc: Tukey HSD for significant variables only ===
+# === Post-Hoc: Tukey HSD for Significant Variables Only ===
 tukey_results <- list()
 
 for (var in variables) {
-  p_val <- anova_summary$p_value[anova_summary$Variable == var]
+  p_val <- ancova_results$p_value[ancova_results$Variable == var]
   if (p_val < 0.05) {
-    model <- aov(as.formula(paste(var, "~ school")), data = df_use_drop)
-    tukey_results[[var]] <- TukeyHSD(model)
-    
-    print(paste0("===== Tukey HSD results for ", var, " ====="))
-    print(tukey_results[[var]])
+    model <- aov(as.formula(paste(var, "~ school + WC")), data = df)
+    tukey_out <- suppressWarnings(TukeyHSD(model, "school"))
+    tukey_results[[var]] <- tukey_out
+    print(paste0("===== Tukey HSD for ", var, " ====="))
+    print(tukey_out)
   }
 }
 
-# === Bar Plot of Eta-Squared Values ===
-ggplot(anova_summary, aes(x = reorder(Variable, eta_squared), y = eta_squared)) +
-  geom_col(fill = "#bf5700") +
-  coord_flip() +
-  labs(
-    title = "Effect Sizes by LIWC Variable (η²)",
-    x = "LIWC Variable",
-    y = "Eta Squared"
-  ) +
-  theme_minimal(base_size = 14) +
+# === custom color pallet 
+custom_blues <- c("#1E90FF","#4682B4", "#00BFFF","#5F9EA0","#4169E1")
+
+# === Bar Plot: Emotion Words ===
+df %>%
+  pivot_longer(cols = all_of(emotion_words), names_to = "emotion_words", values_to = "value") %>%
+  ggplot(aes(x = school, y = value, fill = school)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = "dodge", width = 0.2) +
+  facet_wrap(~ emotion_words, scales = "free_y") +
+  labs(title = "Mean LIWC Emotion Word Scores by University",
+       x = "University", y = "Mean Score") +
+  theme_minimal() +
+  scale_fill_manual(values = custom_blues) +
   theme(
-    plot.title = element_text(hjust = 0.5)  # ✅ Center the title
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5)
   )
 
-# === HEATMAP of means ===
-# Prepare matrix
-heatmap_matrix <- school_means %>%
-  column_to_rownames("school") %>%
-  as.matrix()
+# === Bar Plot: Function Words ===
+df %>%
+  pivot_longer(cols = all_of(function_words), names_to = "function_words", values_to = "value") %>%
+  ggplot(aes(x = school, y = value, fill = school)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = "dodge", width = 0.2) +
+  facet_wrap(~ function_words, scales = "free_y") +
+  labs(title = "Mean LIWC Emotion Word Scores by University",
+       x = "University", y = "Mean Score") +
+  theme_minimal() +
+  scale_fill_manual(values = custom_blues) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5)
+  )
+# === Table of Effect Sizes for Function and Emotion Words ===
 
-desired_order <- c("ppron", "i", "we", "you", "cogproc",
-                   "emo_pos", "emo_neg", "prosocial", "affiliation", "work")
-heatmap_matrix <- heatmap_matrix[, desired_order]
+# Table 1: Function Words
+function_effects <- ancova_results %>%
+  filter(Variable %in% function_words) %>%
+  select(Variable,partial_eta2)
 
-# Create the clean heatmap
-pheatmap(
-  mat = heatmap_matrix,
-  scale = "column",
-  cluster_rows = FALSE,
-  cluster_cols = FALSE,
-  color = colorRampPalette(c("white", "#bf5700"))(100), #steelblue
-  fontsize_row = 12,
-  fontsize_col = 10,
-  angle_col = 45,
-  main = "Average LIWC Scores by School",
-  border_color = NA
+# Table 2: Emotion Words
+emotion_effects <- ancova_results %>%
+  filter(Variable %in% emotion_words) %>%
+  select(Variable,partial_eta2)
+
+# View tables
+print("Function Word Effect Sizes:")
+print(function_effects)
+
+print("Emotion Word Effect Sizes:")
+print(emotion_effects)
+
+# Stylized Table: Function Words
+ggtexttable(
+  function_effects,
+  rows = NULL,
+  theme = ttheme(
+    colnames.style = colnames_style(color = "white", fill = "#156082", face = "bold", size = 14),
+    tbody.style = tbody_style(color = "black", fill = "#f6f6f6", size = 12)
+  )
 )
 
-# === BOX PLOTS ===
-plot_liwc_box <- function(var, x_label = FALSE, y_label = FALSE) {
-  ggplot(df_use_drop, aes(x = school, y = .data[[var]])) +
-    geom_boxplot(
-      fill = "#bf5700",
-      outlier.size = 1,
-      outlier.alpha = 0.55
-    ) +
-    labs(
-      title = NULL,
-      x = if (x_label) "School" else NULL,
-      y = if (y_label) paste(var, "score") else NULL
-    ) +
-    theme_minimal(base_size = 12) +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      plot.title = element_text(size = 12, face = "bold")
-    )
-}
-
-# 2x2 Boxplot Grid: Top variables
-p1 <- plot_liwc_box("i", y_label = TRUE)
-p2 <- plot_liwc_box("work", y_label = TRUE)
-p3 <- plot_liwc_box("emo_neg", y_label = TRUE, x_label = TRUE)
-p4 <- plot_liwc_box("emo_pos", y_label = TRUE, x_label = TRUE)
-
-(p1 | p2) / (p3 | p4) +
-  plot_annotation(title = "LIWC Category Differences Across Schools")
+# Stylized Table: Emotion Words
+ggtexttable(
+  emotion_effects,
+  rows = NULL,
+  theme = ttheme(
+    colnames.style = colnames_style(color = "white", fill = "#156082", face = "bold", size = 14),
+    tbody.style = tbody_style(color = "black", fill = "#f6f6f6", size = 12)
+  )
+)
