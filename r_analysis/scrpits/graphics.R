@@ -1,43 +1,37 @@
-library(gridExtra)
-library(grid)
-library(tidyverse)
-install.packages("pheatmap")
-library(pheatmap)
-install.packages("ggpubr")  # Run this once
-library(ggpubr) 
+# === Load Required Package ===
+library(ggpubr)  # For ggtexttable()
 
-# TABLE OF LIWC CATEGORIES
+# === LIWC Category Table ===
 liwc_table <- data.frame(
-  "LIWC Category" = c("ppron (Personal pronouns)", 
-                      "i (1st person singular)", 
-                      "we (1st person plural)", 
-                      "you (2nd person)", 
-                      "cog_proc (Cognitive processes)",
-                      "emo_pos (Positive emotion)", 
-                      "emo_neg (Negative emotion)", 
-                      "prosocial (Prosocial behavior)", 
-                      "affiliation", 
-                      "work"),
+  "LIWC Category" = c(
+    "i (1st person singular)", 
+    "we (1st person plural)", 
+    "you (2nd person)", 
+    "shehe (3rd person singular)",
+    "emo_pos (Positive emotion)", 
+    "emo_anx (Anxiety)", 
+    "emo_anger (Anger)", 
+    "emo_sad (Sadness)"
+  ),
   "Example Words" = c(
-    "I, you, my, me",
     "I, me, my, myself",
     "we, our, us, lets",
     "you, your, u, yourself",
-    "but, not, if, or, know",
+    "he, she, her, his",
     "good, love, happy, hope",
-    "bad, hate, hurt, tired",
-    "care, help, thank, please",
-    "we, our, us, help",
-    "work, school, working, class"
+    "worry, fear, afraid, nervous",
+    "hate, mad, angry, frustr*",
+    ":(, sad, disappoint*, cry"
   ),
   check.names = FALSE
 )
 
+# === Display Stylized Table ===
 ggtexttable(
   liwc_table,
-  rows = NULL,  # no row numbers
+  rows = NULL,
   theme = ttheme(
-    colnames.style = colnames_style(color = "white", fill = "#bf5700", face = "bold", size = 14),
-    tbody.style = tbody_style(color = "black", fill = "white", size = 12)
+    colnames.style = colnames_style(color = "white", fill = "steelblue", face = "bold", size = 14),
+    tbody.style = tbody_style(color = "black", fill = "#f6f6f6", size = 12)
   )
 )
